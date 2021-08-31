@@ -15,17 +15,20 @@ DHT dht(DHT_PIN, DHT11);
 QuadDisplay qd(QD_PIN); // создаём объект класса QuadDisplay и передаём номер пина CS
 
 void setup() {
+//  Serial.begin(9600);
   qd.begin(); // инициализация дисплея
   clock.begin(); // инициализация часов
-  dht.begin(); // инициализация термометра/
+  dht.begin(); // инициализация термометра
+  dht.read(); 
 
   // метод установки времени и даты в модуль вручную
-  //  clock.set(10,25,45,27,07,2005,THURSDAY);
+//  clock.set(10,25,45,27,07,2005,THURSDAY);
   // метод установки времени и даты автоматически при компиляции
-  //  clock.set(__TIMESTAMP__);
+//  clock.set(__TIMESTAMP__);
 }
 
-bool dhtRead = false; // флаг чтения данных с DHT
+uint32_t dhtTimer; // таймер для dht
+int dhtPeriod = 2000; // период чтения данных с dht
 
 void loop() {
   // запрашиваем данные с часов
@@ -35,40 +38,36 @@ void loop() {
   int minute = clock.getMinute();
   int second = clock.getSecond();
 
-  if ((second > 30 && second <= 35) || (second > 0 && second <= 5) ) {
-    // считывание данных с датчика
-    if (!dhtRead) {
-      dht.read();
-      dhtRead = true;
-    }
+  uint32_t dhtTimeLeft = millis() - dhtTimer;
+  if (dhtTimeLeft >= dhtPeriod) {
+    dhtTimer += dhtPeriod * (dhtTimeLeft / dhtPeriod);
+    dht.read();
+  }
+
+  if ((second > 30 && second < 35) || (second > 0 && second < 5) ) {
     // проверяем состояние данных
     switch (dht.getState()) {
-
       case DHT_OK: { // всё OK
-          qd.displayClear();
-          // выводим показания влажности и температуры
-          if ((second > 30 && second <= 33) || (second > 0 && second <= 3)) {
-            qd.displayTemperatureC(dht.getTemperatureC());
-          } else {
-            qd.displayHumidity(dht.getHumidity());
-          }
+          qd.displayTemperatureC(dht.getTemperatureC()); // выводим только температуту т к влажность беспощадно врет
           break;
         }
       case DHT_ERROR_CHECKSUM: { // ошибка контрольной суммы
-          Serial.println("Checksum error");
+//          Serial.println("Checksum error");
+          qd.displayDigits(QD_E, QD_r, QD_r, QD_1);
           break;
         }
       case DHT_ERROR_TIMEOUT: { // превышение времени ожидания
-          Serial.println("Time out error");
+//          Serial.println("Time out error");
+          qd.displayDigits(QD_E, QD_r, QD_r, QD_2);
           break;
         }
       case DHT_ERROR_NO_REPLY: { // данных нет, датчик не реагирует или отсутствует
-          Serial.println("Sensor not connected");
+//          Serial.println("Sensor not connected");
+          qd.displayDigits(QD_E, QD_r, QD_r, QD_0);
           break;
         }
     }
   } else {
-    dhtRead = false;
     qd.displayScore(hour, minute, true);
   }
   delay(500);
